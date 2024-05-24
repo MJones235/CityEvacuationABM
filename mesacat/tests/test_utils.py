@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 from mesacat.utils import create_movie, create_plot
 from unittest import TestCase
 import os
@@ -13,3 +16,8 @@ class TestUtils(TestCase):
 
     def test_create_movie(self):
         create_movie(os.path.join(sample_data, 'test-model'), os.path.join(outputs, 'test-model.mp4'))
+
+if __name__ == '__main__':
+    utils = TestUtils()
+    utils.test_create_plot()
+    utils.test_create_movie()

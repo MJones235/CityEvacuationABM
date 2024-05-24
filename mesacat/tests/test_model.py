@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 from mesacat.model import EvacuationModel
 from unittest import TestCase
 import geopandas as gpd
@@ -9,6 +12,7 @@ if not os.path.exists(outputs):
     os.mkdir(outputs)
 
 extents = gpd.read_file(os.path.join(sample_data, 'extents.gpkg'))
+
 extents = extents[(extents.threshold == 0.1) & (extents.rainfall == 20) &
                   (extents.duration == 3600 * 6) & (extents.green == 1)]
 
@@ -34,3 +38,6 @@ class TestEvacuationModel(TestCase):
             network=network,
             output_path=os.path.join(outputs, 'test-model'),
             seed=1, hazard=extents).run(50)
+
+if __name__ == '__main__':
+    TestEvacuationModel().test_model_run()

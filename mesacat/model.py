@@ -2,8 +2,9 @@ from __future__ import annotations
 from mesa import Model
 from mesa.time import RandomActivation
 import osmnx
-from osmnx.footprints import create_footprints_gdf
+from osmnx.features import features_from_polygon
 from networkx import Graph
+from networkx import write_gml
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 from geopandas import GeoDataFrame, sjoin
@@ -73,10 +74,11 @@ class EvacuationModel(Model):
 
         self.nodes: GeoDataFrame
         self.edges: GeoDataFrame
-        self.nodes, self.edges = osmnx.save_load.graph_to_gdfs(self.G)
+        self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
         if agents is None:
-            agents = GeoDataFrame(geometry=create_footprints_gdf(domain).centroid)
+            agents = GeoDataFrame(geometry=features_from_polygon(domain).centroid)
+            print(agents)
 
         if targets is None:
             targets = osmnx.pois_from_polygon(domain, amenities=list(target_types))
@@ -122,13 +124,13 @@ class EvacuationModel(Model):
                 self.G.nodes[row.osmid]['x'] = row.geometry.x
                 self.G.nodes[row.osmid]['y'] = row.geometry.y
 
-        self.nodes, self.edges = osmnx.save_load.graph_to_gdfs(self.G)
+        self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
-        self.nodes[['osmid', 'geometry']].to_file(output_gpkg, layer='nodes', driver=driver)
-        self.edges[['osmid', 'geometry']].to_file(output_gpkg, layer='edges', driver=driver)
+        self.nodes[['geometry']].to_file(output_gpkg, layer='nodes', driver=driver)
+        self.edges[['geometry']].to_file(output_gpkg, layer='edges', driver=driver)
 
         output_gml = output_path + '.gml'
-        osmnx.nx.write_gml(self.G, path=output_gml)
+        write_gml(self.G, path=output_gml)
         self.igraph = igraph.read(output_gml)
 
         self.target_nodes = targets_outside_hazard_zone.osmid

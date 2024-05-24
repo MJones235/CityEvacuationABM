@@ -165,7 +165,7 @@ def read_model(path):
     model_df = pd.read_csv(path + '.model.csv')
 
     graph = nx.read_gml(path + '.gml')
-    nodes, edges = osmnx.save_load.graph_to_gdfs(graph)
+    nodes, edges = osmnx.convert.graph_to_gdfs(graph)
     nodes.index = nodes.index.astype('int64')
 
     geopackage = path + '.gpkg'
