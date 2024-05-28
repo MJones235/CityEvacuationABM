@@ -13,8 +13,8 @@ See environment.yml
 
 ## Run
 `cd mesacat`
-`python tests/test_model.py`
-`python tests/test_utils.py`
+`python tests/bwaise/test_model.py`
+`python tests/bwaise/test_utils.py`
 
 ## Tests
 `python -m unittests discover`
