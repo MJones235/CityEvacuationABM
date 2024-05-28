@@ -78,7 +78,6 @@ class EvacuationModel(Model):
 
         if agents is None:
             agents = GeoDataFrame(geometry=features_from_polygon(domain).centroid)
-            print(agents)
 
         if targets is None:
             targets = osmnx.pois_from_polygon(domain, amenities=list(target_types))
