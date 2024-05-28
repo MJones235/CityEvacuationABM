@@ -21,7 +21,6 @@ class TestEvacuationModel(TestCase):
 	def test_model_run(self):
 		test_model_path = os.path.join(sample_data, 'test-model')
 		geopackage = test_model_path + '.gpkg'
-		agents = gpd.read_file(geopackage, layer='agents')
 		targets = gpd.read_file(geopackage, layer='targets')
 		domain = gpd.read_file(domain_file).geometry[0]
 		domain, _ = osmnx.projection.project_geometry(domain, 'EPSG:3857', to_latlong=True)
