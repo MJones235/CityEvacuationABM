@@ -21,11 +21,10 @@ class TestEvacuationModel(TestCase):
 	def test_model_run(self):
 		test_model_path = os.path.join(sample_data, 'test-model')
 		geopackage = test_model_path + '.gpkg'
-		targets = gpd.read_file(geopackage, layer='targets')
 		hazard = gpd.read_file(geopackage, layer='hazards')
 		domain = gpd.read_file(domain_file).geometry[0]
 		domain, _ = osmnx.projection.project_geometry(domain, 'EPSG:3857', to_latlong=True)
-		BombEvacuationModel(domain, targets, hazard).run(1)
+		BombEvacuationModel(domain, hazard).run(1)
 
 if __name__ == '__main__':
     TestEvacuationModel().test_model_run()
