@@ -28,6 +28,11 @@ class BombEvacuationAgent(Agent):
 		self.distance_along_edge = 0
 		self.lat = None
 		self.lon = None
+		self.evacuated = False
+		self.stranded = False
+		self.speed = 3
+		self.highway = None
+		self.reroute_count = -1
 
 	def update_route(self):
 		# indices of target nodes
@@ -64,3 +69,28 @@ class BombEvacuationAgent(Agent):
 	def step(self):
 		"""Moves the agent towards the target node by 10 seconds"""
 
+		if self.evacuated: return
+
+		distance_to_travel = self.speed / 60 / 60 * 10 * 1000  # metres travelled in ten seconds
+
+		# if agent passes through one or more nodes during the step
+		while distance_to_travel >= self.distance_to_next_node():
+			distance_to_travel -= self.distance_to_next_node()
+			self.route_index += 1
+			self.distance_along_edge = 0
+			self.model.grid.move_agent(self, self.route[self.route_index])
+		
+			# if target is reached
+			if self.route_index == len(self.route) - 1:
+				self.lat = self.model.nodes.loc[self.pos].geometry.y
+				self.lon = self.model.nodes.loc[self.pos].geometry.x
+				self.evacuated = True
+				return
+			else:
+				edge = self.model.G.get_edge_data(self.route[self.route_index], self.route[self.route_index + 1])[0]
+				if 'osmid' in edge.keys():
+					self.highway = edge['osmid']
+
+
+		self.distance_along_edge += distance_to_travel
+		self.update_location()

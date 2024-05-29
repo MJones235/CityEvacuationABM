@@ -9,6 +9,7 @@ import geopandas as gpd
 import os
 import osmnx
 from mesacat.bomb_model import BombEvacuationModel
+from mesacat.utils import create_movie
 
 sample_data = os.path.join(os.path.dirname(__file__), 'sample_data')
 domain_file = os.path.join(sample_data, 'newcastle-small.gpkg')
@@ -24,7 +25,8 @@ class TestEvacuationModel(TestCase):
 		hazard = gpd.read_file(geopackage, layer='hazards')
 		domain = gpd.read_file(domain_file).geometry[0]
 		domain, _ = osmnx.projection.project_geometry(domain, 'EPSG:3857', to_latlong=True)
-		BombEvacuationModel(domain, hazard).run(1)
+		BombEvacuationModel(os.path.join(outputs, 'test-model'), domain, hazard).run(50)
 
 if __name__ == '__main__':
     TestEvacuationModel().test_model_run()
+    create_movie(os.path.join(outputs, 'test-model'), os.path.join(outputs, 'test-model.mp4'))

@@ -2,6 +2,7 @@ from typing import Optional
 from mesa import Model
 from mesa.space import NetworkGrid
 from mesa.time import RandomActivation
+from mesa.datacollection import DataCollector
 import osmnx
 import pointpats.random
 from shapely.geometry import Polygon, Point
@@ -12,6 +13,9 @@ import numpy as np
 from . import bomb_agent
 import igraph
 import pointpats
+import pandas as pd
+from networkx import write_gml
+
 
 class BombEvacuationModel(Model):
 	"""A Mesa ABM model to simulation evacuation during a bomb threat
@@ -24,10 +28,12 @@ class BombEvacuationModel(Model):
 
 	def __init__(
 			self, 
+			output_path: str,
 			domain: Polygon, 
 			hazard: GeoDataFrame):
 		super().__init__()
 
+		self.output_path = output_path
 		self.schedule = RandomActivation(self)
 		
 		# set evacuation zone
@@ -36,15 +42,17 @@ class BombEvacuationModel(Model):
 		# generate road network graph within domain area
 		self.G = osmnx.graph_from_polygon(domain, simplify=False)
 		self.G = self.G.to_undirected()
+
 		self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
+
 		nodes_tree = cKDTree(np.transpose([self.nodes.geometry.x, self.nodes.geometry.y]))
 
 		# place one agent in each building
-		agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(domain, size=300)], crs='EPSG:4326')
-
-		agents_in_hazard_zone = sjoin(agents, self.hazard)
+		self.agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(domain, size=10000)], crs='EPSG:4326')
+ 
+		agents_in_hazard_zone = sjoin(self.agents, self.hazard)
 		agents_in_hazard_zone = agents_in_hazard_zone.loc[~agents_in_hazard_zone.index.duplicated(keep='first')]
-		agents_outside_hazard_zone = agents[~agents.index.isin(agents_in_hazard_zone.index.values)]
+		agents_outside_hazard_zone = self.agents[~self.agents.index.isin(agents_in_hazard_zone.index.values)]
 		
 		# set targets to be the points on the road network at the edge of the evacuation zone
 		targets = self.edges.unary_union.intersection(self.hazard.iloc[0].geometry.boundary)
@@ -59,7 +67,7 @@ class BombEvacuationModel(Model):
 			d_start = self.calculate_distance(Point(self.G.nodes[start_node]['x'], self.G.nodes[start_node]['y']), Point(row.geometry.x, row.geometry.y))
 			d_end = self.calculate_distance(Point(self.G.nodes[end_node]['x'], self.G.nodes[end_node]['y']), Point(row.geometry.x, row.geometry.y))
 			
-			id = "target" + str(index[1])
+			id = index[1]
 			edge_attrs = self.G[start_node][end_node]
 
 			# remove the old road
@@ -72,10 +80,21 @@ class BombEvacuationModel(Model):
 			
 		self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 		
-		self.target_nodes = self.nodes[self.nodes.index.str.contains('target', na=False)]
+		self.target_nodes = self.nodes[self.nodes.index < len(self.targets)]
 
 		self.grid = NetworkGrid(self.G)
 		self.igraph = igraph.Graph.from_networkx(self.G)
+
+		# write output files
+		output_gml = output_path + '.gml'
+		write_gml(self.G, path=output_gml)
+
+		output_gpkg = output_path + '.gpkg'
+		self.hazard.to_file(output_gpkg, layer='hazard', driver='GPKG')
+		agents_in_hazard_zone.to_file(output_gpkg, layer='agents', driver='GPKG')
+		self.target_nodes.to_file(output_gpkg, layer='targets', driver='GPKG')
+		self.nodes[['geometry']].to_file(output_gpkg, layer='nodes', driver='GPKG')
+		self.edges[['geometry']].to_file(output_gpkg, layer='edges', driver='GPKG')
 
 		# create agents
 		# find the nearest node to each agent
@@ -89,14 +108,19 @@ class BombEvacuationModel(Model):
 			a.update_route()
 			a.update_location()
 
-		# plot the results
-		f, ax = osmnx.plot_graph(self.G, show=False, node_size=0)
-		self.hazard.plot(ax=ax, color='red', alpha=0.2)
-		self.targets.plot(ax=ax, markersize=4, color='yellow')
-		agents_in_hazard_zone.plot(ax=ax, markersize=2, color='red')
-		agents_outside_hazard_zone.plot(ax=ax, markersize=2, color='green')
+		self.data_collector = DataCollector(
+			model_reporters={
+				'evacuated': evacuated,
+				'stranded': stranded
+			},
+			agent_reporters={'position': 'pos',
+                             'lat': 'lat',
+                             'lon': 'lon',
+                             'highway': 'highway',
+							 'reroute_count': 'reroute_count',
+                             'status': status}
+		)
 
-		plt.show()
 
 
 	def calculate_distance(self, point1, point2):
@@ -104,8 +128,26 @@ class BombEvacuationModel(Model):
 		df = df.geometry.to_crs("EPSG:27700")
 		return osmnx.distance.euclidean(df.geometry.iloc[0].y, df.geometry.iloc[0].x, df.geometry.iloc[1].y, df.geometry.iloc[1].x)
 
+	def step(self):
+		self.schedule.step()
+		self.data_collector.collect(self)
 
 	def run(self, steps: int):
-		print('running model')
+		self.data_collector.collect(self)
+		for _ in range(steps):
+			self.step()
 
-	
+		self.data_collector.get_agent_vars_dataframe().astype({'highway': pd.Int64Dtype()}).to_csv(
+			self.output_path + '.agent.csv')
+		self.data_collector.get_model_vars_dataframe().to_csv(self.output_path + '.model.csv')
+		return self.data_collector.get_agent_vars_dataframe()
+
+
+def evacuated(m):
+    return len([a for a in m.schedule.agents if a.evacuated])
+
+def stranded(m):
+    return len([a for a in m.schedule.agents if a.stranded])
+
+def status(a):
+    return 1 if a.evacuated else 0
