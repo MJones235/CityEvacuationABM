@@ -48,11 +48,10 @@ class BombEvacuationModel(Model):
 		nodes_tree = cKDTree(np.transpose([self.nodes.geometry.x, self.nodes.geometry.y]))
 
 		# place one agent in each building
-		self.agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(domain, size=10000)], crs='EPSG:4326')
+		self.agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(self.hazard.iloc[0].geometry, size=5000)], crs='EPSG:4326')
  
 		agents_in_hazard_zone = sjoin(self.agents, self.hazard)
 		agents_in_hazard_zone = agents_in_hazard_zone.loc[~agents_in_hazard_zone.index.duplicated(keep='first')]
-		agents_outside_hazard_zone = self.agents[~self.agents.index.isin(agents_in_hazard_zone.index.values)]
 		
 		# set targets to be the points on the road network at the edge of the evacuation zone
 		targets = self.edges.unary_union.intersection(self.hazard.iloc[0].geometry.boundary)
