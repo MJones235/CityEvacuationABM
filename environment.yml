@@ -10,5 +10,6 @@ dependencies:
   - python-igraph=0.10.4
   - geopandas=0.14.4
   - ffmpeg=5.1.2
+  - pointpats=2.4.0
   - pip:
       - mesa==2.3.0

@@ -133,7 +133,7 @@ class EvacuationModel(Model):
         self.igraph = igraph.read(output_gml)
 
         self.target_nodes = targets_outside_hazard_zone.osmid
-
+        
         self.grid = NetworkGrid(self.G)
 
         # Create agents

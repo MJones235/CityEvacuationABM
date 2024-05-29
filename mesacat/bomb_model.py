@@ -1,12 +1,17 @@
 from typing import Optional
 from mesa import Model
 from mesa.space import NetworkGrid
+from mesa.time import RandomActivation
 import osmnx
+import pointpats.random
 from shapely.geometry import Polygon, Point
 from geopandas import GeoDataFrame, GeoSeries, sjoin
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 import numpy as np
+from . import bomb_agent
+import igraph
+import pointpats
 
 class BombEvacuationModel(Model):
 	"""A Mesa ABM model to simulation evacuation during a bomb threat
@@ -22,6 +27,8 @@ class BombEvacuationModel(Model):
 			domain: Polygon, 
 			hazard: GeoDataFrame):
 		super().__init__()
+
+		self.schedule = RandomActivation(self)
 		
 		# set evacuation zone
 		self.hazard = hazard.to_crs(epsg=4326)
@@ -33,17 +40,12 @@ class BombEvacuationModel(Model):
 		nodes_tree = cKDTree(np.transpose([self.nodes.geometry.x, self.nodes.geometry.y]))
 
 		# place one agent in each building
-		buildings = osmnx.features_from_polygon(domain, tags={'building': True}).to_crs(epsg = 27700)
-		agents = GeoDataFrame(geometry=buildings.centroid).to_crs(epsg=4326)
+		agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(domain, size=300)], crs='EPSG:4326')
 
 		agents_in_hazard_zone = sjoin(agents, self.hazard)
 		agents_in_hazard_zone = agents_in_hazard_zone.loc[~agents_in_hazard_zone.index.duplicated(keep='first')]
 		agents_outside_hazard_zone = agents[~agents.index.isin(agents_in_hazard_zone.index.values)]
 		
-		# find the nearest node to each agent
-		_, node_idx = nodes_tree.query(
-            np.transpose([agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]))
-
 		# set targets to be the points on the road network at the edge of the evacuation zone
 		targets = self.edges.unary_union.intersection(self.hazard.iloc[0].geometry.boundary)
 		s = GeoSeries(targets).explode(index_parts=True)
@@ -69,10 +71,26 @@ class BombEvacuationModel(Model):
 			self.G.add_edge(id, end_node, **{**edge_attrs, 'length': d_end})
 			
 		self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
+		
+		self.target_nodes = self.nodes[self.nodes.index.str.contains('target', na=False)]
+
 		self.grid = NetworkGrid(self.G)
+		self.igraph = igraph.Graph.from_networkx(self.G)
+
+		# create agents
+		# find the nearest node to each agent
+		_, node_idx = nodes_tree.query(
+            np.transpose([agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]))
+
+		for i, idx in enumerate(node_idx):
+			a = bomb_agent.BombEvacuationAgent(i, self)
+			self.schedule.add(a)
+			self.grid.place_agent(a, self.nodes.index[idx])
+			a.update_route()
+			a.update_location()
 
 		# plot the results
-		f, ax = osmnx.plot_graph(self.G, show=False)
+		f, ax = osmnx.plot_graph(self.G, show=False, node_size=0)
 		self.hazard.plot(ax=ax, color='red', alpha=0.2)
 		self.targets.plot(ax=ax, markersize=4, color='yellow')
 		agents_in_hazard_zone.plot(ax=ax, markersize=2, color='red')
