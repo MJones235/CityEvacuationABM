@@ -30,14 +30,15 @@ class BombEvacuationModel(Model):
 			self, 
 			output_path: str,
 			domain: Polygon, 
-			hazard: GeoDataFrame):
+			hazard: GeoDataFrame,
+			agents: GeoDataFrame):
 		super().__init__()
 
 		self.output_path = output_path
 		self.schedule = RandomActivation(self)
 		
 		# set evacuation zone
-		self.hazard = hazard.to_crs(epsg=4326)
+		self.hazard = hazard
 
 		# generate road network graph within domain area
 		self.G = osmnx.graph_from_polygon(domain, simplify=False)
@@ -47,10 +48,8 @@ class BombEvacuationModel(Model):
 
 		nodes_tree = cKDTree(np.transpose([self.nodes.geometry.x, self.nodes.geometry.y]))
 
-		# place one agent in each building
-		self.agents = GeoDataFrame(geometry=[Point(coords) for coords in pointpats.random.poisson(self.hazard.iloc[0].geometry, size=5000)], crs='EPSG:4326')
- 
-		agents_in_hazard_zone = sjoin(self.agents, self.hazard)
+
+		agents_in_hazard_zone = sjoin(agents, self.hazard)
 		agents_in_hazard_zone = agents_in_hazard_zone.loc[~agents_in_hazard_zone.index.duplicated(keep='first')]
 		
 		# set targets to be the points on the road network at the edge of the evacuation zone
