@@ -1,9 +1,8 @@
 import sys
+sys.path.append('..')
 
 import osmnx.convert
 import osmnx.projection 
-sys.path.append('..')
-
 from unittest import TestCase
 import geopandas as gpd
 import os
@@ -19,6 +18,8 @@ outputs = os.path.join(os.path.dirname(__file__), 'outputs')
 if not os.path.exists(outputs):
 	os.mkdir(outputs)
 
+population_data = os.path.join(os.path.dirname(__file__), 'population_data')
+
 class TestEvacuationModel(TestCase):
 	def test_model_run(self):
 		test_model_path = os.path.join(sample_data, 'test-model')
@@ -26,7 +27,7 @@ class TestEvacuationModel(TestCase):
 		hazard = gpd.read_file(geopackage, layer='hazards').to_crs(epsg=4326)
 		domain = gpd.read_file(domain_file).geometry[0]
 		domain, _ = osmnx.projection.project_geometry(domain, 'EPSG:3857', to_latlong=True)
-		agents = generate_agents(hazard, 5000)
+		agents = generate_agents(domain, 5000, population_data)
 		BombEvacuationModel(os.path.join(outputs, 'test-model'), domain, hazard, agents).run(50)
 
 if __name__ == '__main__':

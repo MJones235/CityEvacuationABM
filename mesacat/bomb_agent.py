@@ -20,7 +20,7 @@ class BombEvacuationAgent(Agent):
 	"""
 
 	def __init__(self, unique_id: int, 
-			evacuation_model: bomb_model.BombEvacuationModel):
+			evacuation_model: bomb_model.BombEvacuationModel, agent: dict):
 		super().__init__(unique_id, evacuation_model)
 		self.pos: int
 		self.route = []
@@ -30,9 +30,10 @@ class BombEvacuationAgent(Agent):
 		self.lon = None
 		self.evacuated = False
 		self.stranded = False
-		self.speed = 3
 		self.highway = None
 		self.reroute_count = -1
+		self.demographic = agent['demographic']
+		self.speed = agent['walking_speed']
 
 	def update_route(self):
 		# indices of target nodes

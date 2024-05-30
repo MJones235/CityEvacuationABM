@@ -1,6 +1,6 @@
 graph [
   multigraph 1
-  created_date "2024-05-30 09:22:49"
+  created_date "2024-05-30 15:38:09"
   created_with "OSMnx 1.9.3"
   crs "epsg:4326"
   node [

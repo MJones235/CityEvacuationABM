@@ -100,7 +100,8 @@ class BombEvacuationModel(Model):
             np.transpose([agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]))
 
 		for i, idx in enumerate(node_idx):
-			a = bomb_agent.BombEvacuationAgent(i, self)
+			agent = agents_in_hazard_zone.iloc[i]
+			a = bomb_agent.BombEvacuationAgent(i, self, agent)
 			self.schedule.add(a)
 			self.grid.place_agent(a, self.nodes.index[idx])
 			a.update_route()
