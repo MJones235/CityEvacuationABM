@@ -10,11 +10,15 @@ import osmnx
 from mesacat.bomb_model import BombEvacuationModel
 from mesacat.utils import create_movie
 from mesacat.generate_agents import generate_agents
+import datetime
+import time
 
 sample_data = os.path.join(os.path.dirname(__file__), 'sample_data')
 domain_file = os.path.join(sample_data, 'newcastle-small.gpkg')
+		
+current_time = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
 
-outputs = os.path.join(os.path.dirname(__file__), 'outputs')
+outputs = os.path.join(os.path.dirname(__file__), 'outputs', current_time)
 if not os.path.exists(outputs):
 	os.mkdir(outputs)
 
@@ -27,7 +31,8 @@ class TestEvacuationModel(TestCase):
 		hazard = gpd.read_file(geopackage, layer='hazards').to_crs(epsg=4326)
 		domain = gpd.read_file(domain_file).geometry[0]
 		domain, _ = osmnx.projection.project_geometry(domain, 'EPSG:3857', to_latlong=True)
-		agents = generate_agents(domain, 5000, population_data)
+		start_time = datetime.time(hour=5)
+		agents = generate_agents(domain, 5000, population_data, start_time)
 		BombEvacuationModel(os.path.join(outputs, 'test-model'), domain, hazard, agents).run(50)
 
 if __name__ == '__main__':

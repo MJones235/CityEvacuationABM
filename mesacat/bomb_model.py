@@ -4,7 +4,6 @@ from mesa.space import NetworkGrid
 from mesa.time import RandomActivation
 from mesa.datacollection import DataCollector
 import osmnx
-import pointpats.random
 from shapely.geometry import Polygon, Point
 from geopandas import GeoDataFrame, GeoSeries, sjoin
 import matplotlib.pyplot as plt
@@ -12,7 +11,6 @@ from scipy.spatial import cKDTree
 import numpy as np
 from . import bomb_agent
 import igraph
-import pointpats
 import pandas as pd
 from networkx import write_gml
 
@@ -48,10 +46,12 @@ class BombEvacuationModel(Model):
 
 		nodes_tree = cKDTree(np.transpose([self.nodes.geometry.x, self.nodes.geometry.y]))
 
-
 		agents_in_hazard_zone = sjoin(agents, self.hazard)
+
 		agents_in_hazard_zone = agents_in_hazard_zone.loc[~agents_in_hazard_zone.index.duplicated(keep='first')]
 		
+		assert len(agents_in_hazard_zone) > 0, 'There are no agents within the hazard zone'
+
 		# set targets to be the points on the road network at the edge of the evacuation zone
 		targets = self.edges.unary_union.intersection(self.hazard.iloc[0].geometry.boundary)
 		s = GeoSeries(targets).explode(index_parts=True)
