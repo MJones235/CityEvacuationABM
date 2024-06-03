@@ -7,6 +7,8 @@ import pointpats
 import networkx as nx
 from geopandas import GeoSeries
 
+from mesacat.generate_schedule import get_schedule
+
 
 def plot_graph(G: nx.DiGraph) -> None:
     """
@@ -19,19 +21,29 @@ def plot_graph(G: nx.DiGraph) -> None:
 
 
 def position_at_time(
-    schedule: nx.DiGraph, t: time, home: GeoSeries, work: GeoSeries, school: GeoSeries
+    agent_type: int,
+    t: time,
+    home: GeoSeries,
+    work: GeoSeries,
+    school: GeoSeries,
+    supermarket: GeoSeries,
+    shop: GeoSeries,
+    recreation: GeoSeries,
 ) -> Point:
     """
     Determine the location of an agent at a given time, based off their daily schedule
 
     Args:
-        schedule (DiGraph): graph representing the agent's daily schedule
+        agent_type (int): agent type identifier
         t (time): time of day
         home (GeoSeries): agent's home location
         work (GeoSeries): agent's work location
         school (GeoSeries): agent's (or their child's) school location
+        supermarket (GeoSeries): agent's assigned supermarket
+        shop (GeoSeries): agent's assigned shop
+        recreation (GeoSeries): location of agent's assigned recreational activity
     """
-
+    schedule = get_schedule(agent_type)
     # assume that the agent will always be in the same location at the start of the day (most likely at home)
     # this is the start node and it has zero incoming edges
     current_node = [n for n, d in schedule.in_degree() if d == 0][0]
@@ -77,11 +89,21 @@ def position_at_time(
         current_node = next_node_name
         arrival_time = leave_time
 
-    current_location = point_from_node_name(current_node, home, work, school)
+    current_location = point_from_node_name(
+        current_node, home, work, school, supermarket, shop, recreation
+    )
     return current_location
 
 
-def point_from_node_name(node: str, home: object, work: object, school: object):
+def point_from_node_name(
+    node: str,
+    home: GeoSeries,
+    work: GeoSeries,
+    school: GeoSeries,
+    supermarket: GeoSeries,
+    shop: GeoSeries,
+    recreation: GeoSeries,
+):
     """
     Return the geopgraphic location of the agent based on the name of the node they are at
     """
@@ -91,8 +113,14 @@ def point_from_node_name(node: str, home: object, work: object, school: object):
         return random_point_in_polygon(work.geometry)
     elif "school" in node:
         return random_point_in_polygon(school.geometry)
+    elif "supermarket" in node:
+        return random_point_in_polygon(supermarket.geometry)
+    elif "shop" in node:
+        return random_point_in_polygon(shop.geometry)
+    elif "recreation" in node:
+        return random_point_in_polygon(recreation.geometry)
     else:
-        return Point(0, 0)
+        ValueError("Unknown location: {0}".format(node))
 
 
 def random_point_in_polygon(geometry: Polygon):
