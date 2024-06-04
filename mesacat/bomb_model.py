@@ -19,7 +19,15 @@ class BombEvacuationModel(Model):
     """A Mesa ABM model to simulation evacuation during a bomb threat
 
     Args:
-        domain: Bounding polygon used to select OSM data
+        domain: Bounding polygon used t"T={}min\n{}/{} Agents Evacuated ({:.0f}%)\n{}/{} Agents Stranded ({:.0f}%)".format(
+                    (step * 10) // 60,
+                    evacuated_total,
+                    len(agent_locations),
+                    evacuated_total / len(agent_locations) * 100,
+                    stranded,
+                    len(agent_locations),
+                    stranded / len(agent_locations) * 100,
+                )o select OSM data
         agents: Spatial table of agent starting locations
         hazard: Spatial table of bomb exclusion zones
     """
@@ -106,7 +114,11 @@ class BombEvacuationModel(Model):
 
         output_gpkg = output_path + ".gpkg"
         self.hazard.to_file(output_gpkg, layer="hazard", driver="GPKG")
-        agents_in_hazard_zone.to_file(output_gpkg, layer="agents", driver="GPKG")
+
+        agents_in_hazard_zone[
+            ["agent_type", "walking_speed", "geometry", "home"]
+        ].to_file(output_gpkg, layer="agents", driver="GPKG")
+
         self.target_nodes.to_file(output_gpkg, layer="targets", driver="GPKG")
         self.nodes[["geometry"]].to_file(output_gpkg, layer="nodes", driver="GPKG")
         self.edges[["geometry"]].to_file(output_gpkg, layer="edges", driver="GPKG")

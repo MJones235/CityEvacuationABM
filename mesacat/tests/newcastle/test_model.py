@@ -36,7 +36,7 @@ class TestEvacuationModel(TestCase):
             domain, "EPSG:3857", to_latlong=True
         )
         start_time = datetime.time(hour=9)
-        agents = generate_agents(domain, 15000, population_data, start_time)
+        agents = generate_agents(domain, 5000, population_data, start_time)
         BombEvacuationModel(
             os.path.join(outputs, "test-model"), domain, hazard, agents
         ).run(50)
@@ -45,5 +45,7 @@ class TestEvacuationModel(TestCase):
 if __name__ == "__main__":
     TestEvacuationModel().test_model_run()
     create_movie(
-        os.path.join(outputs, "test-model"), os.path.join(outputs, "test-model.mp4")
+        os.path.join(outputs, "test-model"),
+        os.path.join(outputs, "test-model.mp4"),
+        is_bomb_model=True,
     )

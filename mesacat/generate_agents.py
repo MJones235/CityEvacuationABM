@@ -71,6 +71,11 @@ def generate_agents(
         axis=1,
     )
 
+    locations = ["home", "work", "school", "supermarket", "shop", "recreation"]
+
+    for location in locations:
+        agents[location] = agents[location].apply(lambda loc: loc["osmid"])
+
     return agents
 
 
