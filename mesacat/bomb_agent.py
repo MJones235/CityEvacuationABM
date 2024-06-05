@@ -2,6 +2,9 @@ from __future__ import annotations
 from . import bomb_model
 from mesa import Agent
 import numpy as np
+from shapely import LineString, Point
+from pyproj import Transformer
+from geopandas import GeoDataFrame
 
 
 class BombEvacuationAgent(Agent):
@@ -93,23 +96,48 @@ class BombEvacuationAgent(Agent):
 
         # if agent passes through one or more nodes during the step
         while distance_to_travel >= self.distance_to_next_node():
-            distance_to_travel -= self.distance_to_next_node()
-            self.route_index += 1
-            self.distance_along_edge = 0
-            self.model.grid.move_agent(self, self.route[self.route_index])
+            all_agents = self.model.grid.get_all_cell_contents()
 
-            # if target is reached
-            if self.route_index == len(self.route) - 1:
-                self.lat = self.model.nodes.loc[self.pos].geometry.y
-                self.lon = self.model.nodes.loc[self.pos].geometry.x
-                self.evacuated = True
-                return
+            agents_in_path = [
+                agent
+                for agent in all_agents
+                if agent.unique_id != self.unique_id
+                and agent.route[agent.route_index] == self.route[self.route_index]
+                and agent.distance_along_edge > self.distance_along_edge
+                and agent.distance_along_edge - self.distance_along_edge
+                < distance_to_travel
+            ]
+
+            if len(agents_in_path) == 0:
+                distance_to_travel -= self.distance_to_next_node()
+                self.route_index += 1
+                self.distance_along_edge = 0
+                self.model.grid.move_agent(self, self.route[self.route_index])
+
+                # if target is reached
+                if self.route_index == len(self.route) - 1:
+                    self.lat = self.model.nodes.loc[self.pos].geometry.y
+                    self.lon = self.model.nodes.loc[self.pos].geometry.x
+                    self.evacuated = True
+                    return
+                else:
+                    edge = self.model.G.get_edge_data(
+                        self.route[self.route_index], self.route[self.route_index + 1]
+                    )[0]
+                    if "osmid" in edge.keys():
+                        self.highway = edge["osmid"]
+
             else:
-                edge = self.model.G.get_edge_data(
-                    self.route[self.route_index], self.route[self.route_index + 1]
+                nearest_agent_distance = sorted(
+                    [agent.distance_along_edge for agent in agents_in_path]
                 )[0]
-                if "osmid" in edge.keys():
-                    self.highway = edge["osmid"]
+
+                distance_to_travel = (
+                    nearest_agent_distance - self.distance_along_edge - 1
+                )
+                if distance_to_travel < 0:
+                    distance_to_travel = 0
+                break
 
         self.distance_along_edge += distance_to_travel
         self.update_location()

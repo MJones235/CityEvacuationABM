@@ -19,15 +19,7 @@ class BombEvacuationModel(Model):
     """A Mesa ABM model to simulation evacuation during a bomb threat
 
     Args:
-        domain: Bounding polygon used t"T={}min\n{}/{} Agents Evacuated ({:.0f}%)\n{}/{} Agents Stranded ({:.0f}%)".format(
-                    (step * 10) // 60,
-                    evacuated_total,
-                    len(agent_locations),
-                    evacuated_total / len(agent_locations) * 100,
-                    stranded,
-                    len(agent_locations),
-                    stranded / len(agent_locations) * 100,
-                )o select OSM data
+        domain: Bounding polygon used
         agents: Spatial table of agent starting locations
         hazard: Spatial table of bomb exclusion zones
     """
@@ -64,14 +56,6 @@ class BombEvacuationModel(Model):
         ]
 
         agents_in_hazard_zone = agents_in_hazard_zone.reset_index()
-
-        self.buffered_agents: GeoDataFrame = GeoDataFrame(
-            agents_in_hazard_zone[["geometry"]]
-        )
-        self.buffered_agents["geometry"] = self.buffered_agents.geometry.to_crs(
-            "EPSG:27700"
-        ).buffer(1)
-        self.buffered_agents = self.buffered_agents.to_crs("EPSG:4326")
 
         assert (
             len(agents_in_hazard_zone) > 0
@@ -191,7 +175,8 @@ class BombEvacuationModel(Model):
 
     def run(self, steps: int):
         self.data_collector.collect(self)
-        for _ in range(steps):
+        for i in range(steps):
+            print("Step {0}".format(i))
             self.step()
 
         self.data_collector.get_agent_vars_dataframe().astype(
