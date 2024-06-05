@@ -192,6 +192,7 @@ def create_movie(
                     for o in occupants
                 ]
             )
+
             evacuated_total = model_df.evacuated.loc[step]
             stranded = model_df.stranded.loc[step]
 
@@ -288,12 +289,16 @@ def read_model(path):
 
     graph = nx.read_gml(path + ".gml")
     nodes, edges = osmnx.convert.graph_to_gdfs(graph)
-    nodes.index = nodes.index.astype("int64")
+
+    agent_nodes = nodes[nodes.index.str.contains("agent-start-pos", na=False)]
+
+    for osmid, _ in agent_nodes.iterrows():
+        graph.remove_node(osmid)
 
     geopackage = path + ".gpkg"
 
     hazard = gpd.read_file(geopackage, layer="hazard")
     target_nodes = gpd.read_file(geopackage, layer="targets")
-    target_nodes = target_nodes.set_index(target_nodes.osmid.astype("int64"))
+    target_nodes.index = target_nodes["osmid"]
 
     return agent_df, model_df, graph, nodes, edges, hazard, target_nodes

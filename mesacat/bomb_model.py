@@ -63,6 +63,16 @@ class BombEvacuationModel(Model):
             ~agents_in_hazard_zone.index.duplicated(keep="first")
         ]
 
+        agents_in_hazard_zone = agents_in_hazard_zone.reset_index()
+
+        self.buffered_agents: GeoDataFrame = GeoDataFrame(
+            agents_in_hazard_zone[["geometry"]]
+        )
+        self.buffered_agents["geometry"] = self.buffered_agents.geometry.to_crs(
+            "EPSG:27700"
+        ).buffer(1)
+        self.buffered_agents = self.buffered_agents.to_crs("EPSG:4326")
+
         assert (
             len(agents_in_hazard_zone) > 0
         ), "There are no agents within the hazard zone"
@@ -90,7 +100,7 @@ class BombEvacuationModel(Model):
                 Point(row.geometry.x, row.geometry.y),
             )
 
-            id = index[1]
+            id = "target{0}".format(index[1])
             edge_attrs = self.G[start_node][end_node]
 
             # remove the old road
@@ -101,9 +111,31 @@ class BombEvacuationModel(Model):
             self.G.add_edge(start_node, id, **{**edge_attrs, "length": d_start})
             self.G.add_edge(id, end_node, **{**edge_attrs, "length": d_end})
 
+            # find the nearest node to each agent
+        _, node_idx = nodes_tree.query(
+            np.transpose(
+                [agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]
+            )
+        )
+
+        for i, agent in agents_in_hazard_zone.iterrows():
+            nearest_node = self.nodes.iloc[node_idx[i]]
+
+            id = "agent-start-pos{0}".format(i)
+
+            d = self.calculate_distance(
+                Point(nearest_node["x"], nearest_node["y"]),
+                Point(agent.geometry.x, agent.geometry.y),
+            )
+
+            self.G.add_node(id, x=agent.geometry.x, y=agent.geometry.y, street_count=1)
+            self.G.add_edge(id, self.nodes.index[node_idx[i]], **{"length": d})
+
         self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
-        self.target_nodes = self.nodes[self.nodes.index < len(self.targets)]
+        self.target_nodes = self.nodes[
+            self.nodes.index.str.contains("target", na=False)
+        ]
 
         self.grid = NetworkGrid(self.G)
         self.igraph = igraph.Graph.from_networkx(self.G)
@@ -123,19 +155,11 @@ class BombEvacuationModel(Model):
         self.nodes[["geometry"]].to_file(output_gpkg, layer="nodes", driver="GPKG")
         self.edges[["geometry"]].to_file(output_gpkg, layer="edges", driver="GPKG")
 
-        # create agents
-        # find the nearest node to each agent
-        _, node_idx = nodes_tree.query(
-            np.transpose(
-                [agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]
-            )
-        )
-
-        for i, idx in enumerate(node_idx):
-            agent = agents_in_hazard_zone.iloc[i]
+        for i, agent in agents_in_hazard_zone.iterrows():
+            id = "agent-start-pos{0}".format(i)
             a = bomb_agent.BombEvacuationAgent(i, self, agent)
             self.schedule.add(a)
-            self.grid.place_agent(a, self.nodes.index[idx])
+            self.grid.place_agent(a, id)
             a.update_route()
             a.update_location()
 
@@ -151,7 +175,7 @@ class BombEvacuationModel(Model):
             },
         )
 
-    def calculate_distance(self, point1, point2):
+    def calculate_distance(self, point1: Point, point2: Point):
         df = GeoDataFrame({"geometry": [point1, point2]}, crs="EPSG:4326")
         df = df.geometry.to_crs("EPSG:27700")
         return osmnx.distance.euclidean(
