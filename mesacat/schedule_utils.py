@@ -5,7 +5,9 @@ import random
 from shapely import Point, Polygon, buffer
 import pointpats
 import networkx as nx
-from geopandas import GeoSeries
+from geopandas import GeoSeries, GeoDataFrame
+from igraph import Graph
+from scipy.spatial import cKDTree
 
 from mesacat.generate_schedule import get_schedule
 
@@ -23,6 +25,10 @@ def plot_graph(G: nx.DiGraph) -> None:
 def position_at_time(
     agent_type: int,
     t: time,
+    igraph: Graph,
+    nodes: GeoDataFrame,
+    nodes_tree: cKDTree,
+    walking_speed: float,
     home: GeoSeries,
     work: GeoSeries,
     school: GeoSeries,
@@ -43,6 +49,7 @@ def position_at_time(
         shop (GeoSeries): agent's assigned shop
         recreation (GeoSeries): location of agent's assigned recreational activity
     """
+
     schedule = get_schedule(agent_type)
     # assume that the agent will always be in the same location at the start of the day (most likely at home)
     # this is the start node and it has zero incoming edges
@@ -86,8 +93,53 @@ def position_at_time(
         )[0]
 
         # teleport the agent to their next destination (travel time is not accounted for)
-        current_node = next_node_name
-        arrival_time = leave_time
+        origin = point_from_node_name(
+            current_node, home, work, school, supermarket, shop, recreation
+        )
+        destination = point_from_node_name(
+            next_node_name, home, work, school, supermarket, shop, recreation
+        )
+
+        _, [origin_idx, destination_idx] = nodes_tree.query(
+            [[origin.x, origin.y], [destination.x, destination.y]]
+        )
+
+        path = igraph.get_shortest_paths(origin_idx, destination_idx, weights="length")[
+            0
+        ]
+
+        total_distance = igraph.shortest_paths(
+            origin_idx, destination_idx, weights="length"
+        )[0][0]
+
+        car_speed = 48  # kph
+        walking_speed = walking_speed
+
+        speed = car_speed if total_distance > 500 else walking_speed
+
+        total_travel_time = (total_distance / 1000) / speed
+
+        arrival_time_at_next_node = leave_time + timedelta(hours=total_travel_time)
+
+        # agent will arrive at their next destination
+        if arrival_time_at_next_node < target_time:
+            current_node = next_node_name
+            arrival_time = arrival_time_at_next_node
+
+        else:
+            i = 0
+            t = leave_time
+            while t < target_time:
+                distance_to_next_node = igraph.shortest_paths(
+                    path[i], path[i + 1], weights="length"
+                )[0][0]
+                time_to_next_node = (distance_to_next_node / 1000) / speed
+
+                t += timedelta(hours=time_to_next_node)
+                i += 1
+
+            node = nodes.iloc[path[i]]
+            return Point(node.x, node.y)
 
     current_location = point_from_node_name(
         current_node, home, work, school, supermarket, shop, recreation
@@ -121,6 +173,33 @@ def point_from_node_name(
         return random_point_in_polygon(recreation.geometry)
     else:
         ValueError("Unknown location: {0}".format(node))
+
+
+def index_from_node_name(
+    node: str,
+    nodes: GeoDataFrame,
+    home: GeoSeries,
+    work: GeoSeries,
+    school: GeoSeries,
+    supermarket: GeoSeries,
+    shop: GeoSeries,
+    recreation: GeoSeries,
+):
+
+    if "home" in node:
+        return nodes.index.get_loc(home.osmid)
+    elif "work" in node:
+        return nodes.index.get_loc(work.osmid)
+    elif "school" in node:
+        return nodes.index.get_loc(school.osmid)
+    elif "supermarket" in node:
+        return nodes.index.get_loc(supermarket.osmid)
+    elif "shop" in node:
+        return nodes.index.get_loc(shop.osmid)
+    elif "recreation" in node:
+        return nodes.index.get_loc(recreation.osmid)
+    else:
+        ValueError("Unknown OSMID: {0}".format(node))
 
 
 def random_point_in_polygon(geometry: Polygon):

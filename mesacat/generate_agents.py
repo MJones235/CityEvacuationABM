@@ -6,6 +6,9 @@ import osmnx as ox
 import matplotlib.pyplot as plt
 from datetime import time
 import random
+import igraph
+from scipy.spatial import cKDTree
+import numpy as np
 
 from mesacat.schedule_utils import position_at_time
 
@@ -22,13 +25,19 @@ def generate_agents(
         start_time (time): time that the simulation will begin at
     """
 
+    G = ox.graph_from_polygon(domain, simplify=False)
+    G = G.to_undirected()
+    iGraph = igraph.Graph.from_networkx(G)
+    nodes, _ = ox.convert.graph_to_gdfs(G)
+    nodes_tree = cKDTree(np.transpose([nodes.geometry.x, nodes.geometry.y]))
+
     agent_types = get_agent_types(in_path)
     agent_types = add_walking_speed(in_path, agent_types)
 
     agents_list = []
 
     for _, agent_type in agent_types.iterrows():
-        count = round(n * agent_type["proportion"])
+        count = round(n * agent_type["proportion"])  # number of agents of this type
         agents_of_type = [
             {
                 "agent_type": agent_type["id"],
@@ -61,6 +70,10 @@ def generate_agents(
         lambda row: position_at_time(
             row["agent_type"],
             start_time,
+            iGraph,
+            nodes,
+            nodes_tree,
+            row["walking_speed"],
             row["home"],
             row["work"],
             row["school"],

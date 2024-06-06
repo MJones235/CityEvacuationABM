@@ -40,7 +40,7 @@ class TestEvacuationModel(TestCase):
             domain,
             hazard,
             population_data,
-            datetime.time(hour=9),
+            datetime.time(hour=8, minute=30),
         ).run(100)
 
 

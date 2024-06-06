@@ -2,9 +2,6 @@ from __future__ import annotations
 from . import bomb_model
 from mesa import Agent
 import numpy as np
-from shapely import LineString, Point
-from pyproj import Transformer
-from geopandas import GeoDataFrame
 
 
 class BombEvacuationAgent(Agent):
@@ -57,7 +54,6 @@ class BombEvacuationAgent(Agent):
         )[0]
         target = targets[int(np.argmin(target_distances))]
         path = self.model.igraph.get_shortest_paths(source, target, weights="length")[0]
-
         self.route = self.model.nodes.iloc[path].index
         self.route_index = 0
 

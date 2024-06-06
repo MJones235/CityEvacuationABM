@@ -34,7 +34,7 @@ def create_movie(
     rerouted_agents_color = "red"
     repeatedly_rerouted_agents_color = "purple"
     agents_marker = "o"
-    agents_size = 10
+    agents_size = 2
     agents_alpha = 1
     edge_color = "#999999"
 

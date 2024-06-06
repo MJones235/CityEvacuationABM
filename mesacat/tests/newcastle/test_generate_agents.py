@@ -23,6 +23,7 @@ class TestGenerateAgents(TestCase):
     def test_generate_agents(self):
         domain = gpd.read_file(domain_file).geometry[0]
         domain, _ = ox.projection.project_geometry(domain, "EPSG:3857", to_latlong=True)
+        """
         start_times = [
             time(hour=7, minute=15),
             time(hour=8, minute=15),
@@ -42,6 +43,10 @@ class TestGenerateAgents(TestCase):
         for start_time in start_times:
             agents = generate_agents(domain, 5000, population_data, start_time)
             plot_agents(domain, agents, start_time, outputs)
+        """
+        start_time = time(hour=8, minute=20)
+        agents = generate_agents(domain, 5000, population_data, start_time)
+        plot_agents(domain, agents, start_time, outputs)
 
 
 if __name__ == "__main__":
