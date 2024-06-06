@@ -1,4 +1,3 @@
-from typing import Optional
 from mesa import Model
 from mesa.space import NetworkGrid
 from mesa.time import RandomActivation
@@ -6,7 +5,6 @@ from mesa.datacollection import DataCollector
 import osmnx
 from shapely.geometry import Polygon, Point
 from geopandas import GeoDataFrame, GeoSeries, sjoin
-import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 import numpy as np
 from . import bomb_agent
@@ -21,99 +19,36 @@ class BombEvacuationModel(Model):
     Args:
         domain: Bounding polygon used
         agents: Spatial table of agent starting locations
-        hazard: Spatial table of bomb exclusion zones
+        evacuation_zone: Spatial table of bomb exclusion zones
     """
 
     def __init__(
         self,
         output_path: str,
         domain: Polygon,
-        hazard: GeoDataFrame,
+        evacuation_zone: GeoDataFrame,
         agents: GeoDataFrame,
     ):
         super().__init__()
 
         self.output_path = output_path
+
         self.schedule = RandomActivation(self)
 
-        # set evacuation zone
-        self.hazard = hazard
+        self.evacuation_zone = evacuation_zone
 
         # generate road network graph within domain area
         self.G = osmnx.graph_from_polygon(domain, simplify=False)
         self.G = self.G.to_undirected()
-
         self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
-        nodes_tree = cKDTree(
-            np.transpose([self.nodes.geometry.x, self.nodes.geometry.y])
-        )
+        agents_in_evacuation_zone = self.get_agents_in_evacuation_zone(agents)
 
-        agents_in_hazard_zone = sjoin(agents, self.hazard)
+        self.targets = self.get_targets()
 
-        agents_in_hazard_zone = agents_in_hazard_zone.loc[
-            ~agents_in_hazard_zone.index.duplicated(keep="first")
-        ]
+        self.add_targets_to_graph()
 
-        agents_in_hazard_zone = agents_in_hazard_zone.reset_index()
-
-        assert (
-            len(agents_in_hazard_zone) > 0
-        ), "There are no agents within the hazard zone"
-
-        # set targets to be the points on the road network at the edge of the evacuation zone
-        targets = self.edges.unary_union.intersection(
-            self.hazard.iloc[0].geometry.boundary
-        )
-        s = GeoSeries(targets).explode(index_parts=True)
-        self.targets = GeoDataFrame(geometry=s)
-
-        # add each target as a node to the graph
-        for index, row in self.targets.iterrows():
-            # find the road that the target is on
-            [start_node, end_node, _] = osmnx.distance.nearest_edges(
-                self.G, row.geometry.x, row.geometry.y
-            )
-            # find the distance from the target to each end of the road
-            d_start = self.calculate_distance(
-                Point(self.G.nodes[start_node]["x"], self.G.nodes[start_node]["y"]),
-                Point(row.geometry.x, row.geometry.y),
-            )
-            d_end = self.calculate_distance(
-                Point(self.G.nodes[end_node]["x"], self.G.nodes[end_node]["y"]),
-                Point(row.geometry.x, row.geometry.y),
-            )
-
-            id = "target{0}".format(index[1])
-            edge_attrs = self.G[start_node][end_node]
-
-            # remove the old road
-            self.G.remove_edge(start_node, end_node)
-            # add target node
-            self.G.add_node(id, x=row.geometry.x, y=row.geometry.y, street_count=2)
-            # add two new roads connecting the target to each end of the old road
-            self.G.add_edge(start_node, id, **{**edge_attrs, "length": d_start})
-            self.G.add_edge(id, end_node, **{**edge_attrs, "length": d_end})
-
-            # find the nearest node to each agent
-        _, node_idx = nodes_tree.query(
-            np.transpose(
-                [agents_in_hazard_zone.geometry.x, agents_in_hazard_zone.geometry.y]
-            )
-        )
-
-        for i, agent in agents_in_hazard_zone.iterrows():
-            nearest_node = self.nodes.iloc[node_idx[i]]
-
-            id = "agent-start-pos{0}".format(i)
-
-            d = self.calculate_distance(
-                Point(nearest_node["x"], nearest_node["y"]),
-                Point(agent.geometry.x, agent.geometry.y),
-            )
-
-            self.G.add_node(id, x=agent.geometry.x, y=agent.geometry.y, street_count=1)
-            self.G.add_edge(id, self.nodes.index[node_idx[i]], **{"length": d})
+        self.add_agent_positions_to_graph(agents_in_evacuation_zone)
 
         self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
@@ -124,22 +59,9 @@ class BombEvacuationModel(Model):
         self.grid = NetworkGrid(self.G)
         self.igraph = igraph.Graph.from_networkx(self.G)
 
-        # write output files
-        output_gml = output_path + ".gml"
-        write_gml(self.G, path=output_gml)
+        self.write_output_files(output_path, agents_in_evacuation_zone)
 
-        output_gpkg = output_path + ".gpkg"
-        self.hazard.to_file(output_gpkg, layer="hazard", driver="GPKG")
-
-        agents_in_hazard_zone[
-            ["agent_type", "walking_speed", "geometry", "home"]
-        ].to_file(output_gpkg, layer="agents", driver="GPKG")
-
-        self.target_nodes.to_file(output_gpkg, layer="targets", driver="GPKG")
-        self.nodes[["geometry"]].to_file(output_gpkg, layer="nodes", driver="GPKG")
-        self.edges[["geometry"]].to_file(output_gpkg, layer="edges", driver="GPKG")
-
-        for i, agent in agents_in_hazard_zone.iterrows():
+        for i, agent in agents_in_evacuation_zone.iterrows():
             id = "agent-start-pos{0}".format(i)
             a = bomb_agent.BombEvacuationAgent(i, self, agent)
             self.schedule.add(a)
@@ -168,6 +90,107 @@ class BombEvacuationModel(Model):
             df.geometry.iloc[1].y,
             df.geometry.iloc[1].x,
         )
+
+    def get_agents_in_evacuation_zone(self, agents: GeoDataFrame) -> GeoDataFrame:
+        """
+        Returns a GeoDataFrame containing agents in the evacuation zone at the start of the simulation
+        """
+        agents_in_evacuation_zone = sjoin(agents, self.evacuation_zone)
+
+        agents_in_evacuation_zone = agents_in_evacuation_zone.loc[
+            ~agents_in_evacuation_zone.index.duplicated(keep="first")
+        ]
+
+        agents_in_evacuation_zone = agents_in_evacuation_zone.reset_index()
+
+        assert (
+            len(agents_in_evacuation_zone) > 0
+        ), "There are no agents within the evacuation zone"
+
+        return agents_in_evacuation_zone
+
+    def get_targets(self) -> GeoDataFrame:
+        """
+        Returns a GeoDataFrame containing points on the road network at the edge of the evacuation zone
+        """
+        targets = self.edges.unary_union.intersection(
+            self.evacuation_zone.iloc[0].geometry.boundary
+        )
+        s = GeoSeries(targets).explode(index_parts=True)
+        return GeoDataFrame(geometry=s)
+
+    def add_targets_to_graph(self) -> None:
+        """
+        Add each target as a node in the graph
+        """
+        for index, row in self.targets.iterrows():
+            # find the road that the target is on
+            [start_node, end_node, _] = osmnx.distance.nearest_edges(
+                self.G, row.geometry.x, row.geometry.y
+            )
+            # find the distance from the target to each end of the road
+            d_start = self.calculate_distance(
+                Point(self.G.nodes[start_node]["x"], self.G.nodes[start_node]["y"]),
+                Point(row.geometry.x, row.geometry.y),
+            )
+            d_end = self.calculate_distance(
+                Point(self.G.nodes[end_node]["x"], self.G.nodes[end_node]["y"]),
+                Point(row.geometry.x, row.geometry.y),
+            )
+
+            id = "target{0}".format(index[1])
+            edge_attrs = self.G[start_node][end_node]
+
+            # remove the old road
+            self.G.remove_edge(start_node, end_node)
+            # add target node
+            self.G.add_node(id, x=row.geometry.x, y=row.geometry.y, street_count=2)
+            # add two new roads connecting the target to each end of the old road
+            self.G.add_edge(start_node, id, **{**edge_attrs, "length": d_start})
+            self.G.add_edge(id, end_node, **{**edge_attrs, "length": d_end})
+
+    def add_agent_positions_to_graph(self, agents_in_evacuation_zone: GeoDataFrame):
+        nodes_tree = cKDTree(
+            np.transpose([self.nodes.geometry.x, self.nodes.geometry.y])
+        )
+
+        # find the nearest node to each agent
+        _, node_idx = nodes_tree.query(
+            np.transpose(
+                [
+                    agents_in_evacuation_zone.geometry.x,
+                    agents_in_evacuation_zone.geometry.y,
+                ]
+            )
+        )
+
+        for i, agent in agents_in_evacuation_zone.iterrows():
+            nearest_node = self.nodes.iloc[node_idx[i]]
+
+            id = "agent-start-pos{0}".format(i)
+
+            d = self.calculate_distance(
+                Point(nearest_node["x"], nearest_node["y"]),
+                Point(agent.geometry.x, agent.geometry.y),
+            )
+
+            self.G.add_node(id, x=agent.geometry.x, y=agent.geometry.y, street_count=1)
+            self.G.add_edge(id, self.nodes.index[node_idx[i]], **{"length": d})
+
+    def write_output_files(
+        self, output_path: str, agents_in_evacuation_zone: GeoDataFrame
+    ) -> None:
+        output_gml = output_path + ".gml"
+        write_gml(self.G, path=output_gml)
+
+        output_gpkg = output_path + ".gpkg"
+        self.evacuation_zone.to_file(output_gpkg, layer="hazard", driver="GPKG")
+        agents_in_evacuation_zone[
+            ["agent_type", "walking_speed", "geometry", "home"]
+        ].to_file(output_gpkg, layer="agents", driver="GPKG")
+        self.target_nodes.to_file(output_gpkg, layer="targets", driver="GPKG")
+        self.nodes[["geometry"]].to_file(output_gpkg, layer="nodes", driver="GPKG")
+        self.edges[["geometry"]].to_file(output_gpkg, layer="edges", driver="GPKG")
 
     def step(self):
         self.schedule.step()
