@@ -141,7 +141,7 @@ def position_at_time(
                 i += 1
 
             node = nodes.iloc[path[i - 2]]
-            return (Point(node.x, node.y), nodes.iloc[path[i]].name, in_car)
+            return (Point(node.x, node.y), nodes.iloc[path[i - 1]].name, in_car)
 
     current_location = point_from_node_name(
         current_node, home, work, school, supermarket, shop, recreation

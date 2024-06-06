@@ -38,7 +38,8 @@ class BombEvacuationAgent(Agent):
         self.highway = None
         self.reroute_count = -1
         self.agent_type = agent["agent_type"]
-        self.speed = agent["walking_speed"]
+        self.in_car = agent["in_car"]
+        self.speed = 48 if self.in_car else agent["walking_speed"]
 
     def update_route(self):
         # indices of target nodes
@@ -99,6 +100,7 @@ class BombEvacuationAgent(Agent):
                 for agent in all_agents
                 if agent.unique_id != self.unique_id
                 and agent.route[agent.route_index] == self.route[self.route_index]
+                and agent.in_car == self.in_car
                 and agent.distance_along_edge > self.distance_along_edge
                 and agent.distance_along_edge - self.distance_along_edge
                 < distance_to_travel
