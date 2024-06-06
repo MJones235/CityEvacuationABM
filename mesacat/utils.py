@@ -8,9 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 
-def create_movie(
-    in_path: str, out_path: str, fps: int = 5, is_bomb_model: bool = False
-):
+def create_movie(in_path: str, out_path: str, fps: int = 5):
     """Generates an MP4 video of all model steps using FFmpeg (https://www.ffmpeg.org/)
 
     Args:
@@ -31,8 +29,6 @@ def create_movie(
     targets_marker = "o"
     targets_size = 10
     agents_color = "C1"
-    rerouted_agents_color = "red"
-    repeatedly_rerouted_agents_color = "purple"
     vehicle_agents_color = "purple"
     agents_marker = "o"
     agents_size = 2
@@ -54,99 +50,40 @@ def create_movie(
 
     # Targets
 
-    bomb_model_handles = [
-        Patch(label="Evacuation zone", facecolor=hazard_color, alpha=hazard_alpha),
-        lines.Line2D(
-            [],
-            [],
-            label="Agents",
-            color=agents_color,
-            marker=agents_marker,
-            markersize=agents_size,
-            alpha=agents_alpha,
-            linestyle="None",
-        ),
-        lines.Line2D(
-            [],
-            [],
-            label="Exit points",
-            color=targets_color,
-            marker=targets_marker,
-            markersize=targets_size,
-            linestyle="None",
-        ),
-        lines.Line2D([], [], label="Road Network", color=edge_color, linestyle="-"),
-    ]
-
     ax.legend(
-        handles=(
-            bomb_model_handles
-            if is_bomb_model
-            else [
-                Patch(label="Hazard", facecolor=hazard_color, alpha=hazard_alpha),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Agents",
-                    color=agents_color,
-                    marker=agents_marker,
-                    markersize=agents_size,
-                    alpha=agents_alpha,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Rerouted Agents",
-                    color=rerouted_agents_color,
-                    marker=agents_marker,
-                    markersize=agents_size,
-                    alpha=agents_alpha,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Repeatedly Rerouted Agents",
-                    color=repeatedly_rerouted_agents_color,
-                    marker=agents_marker,
-                    markersize=agents_size,
-                    alpha=agents_alpha,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Vehicles",
-                    color=vehicle_agents_color,
-                    marker=agents_marker,
-                    markersize=agents_size,
-                    alpha=agents_alpha,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Targets",
-                    color=targets_color,
-                    marker=targets_marker,
-                    markersize=targets_size,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [],
-                    [],
-                    label="Targets at Capacity",
-                    color=targets_at_capacity_color,
-                    marker=targets_marker,
-                    markersize=targets_size,
-                    linestyle="None",
-                ),
-                lines.Line2D(
-                    [], [], label="Road Network", color=edge_color, linestyle="-"
-                ),
-            ]
-        )
+        handles=[
+            Patch(label="Evacuation zone", facecolor=hazard_color, alpha=hazard_alpha),
+            lines.Line2D(
+                [],
+                [],
+                label="Pedestrian Agents",
+                color=agents_color,
+                marker=agents_marker,
+                markersize=agents_size,
+                alpha=agents_alpha,
+                linestyle="None",
+            ),
+            lines.Line2D(
+                [],
+                [],
+                label="Vehicle Agents",
+                color=vehicle_agents_color,
+                marker=agents_marker,
+                markersize=agents_size,
+                alpha=agents_alpha,
+                linestyle="None",
+            ),
+            lines.Line2D(
+                [],
+                [],
+                label="Exit points",
+                color=targets_color,
+                marker=targets_marker,
+                markersize=targets_size,
+                linestyle="None",
+            ),
+            lines.Line2D([], [], label="Road Network", color=edge_color, linestyle="-"),
+        ]
     )
 
     with writer.saving(f, out_path, f.dpi):
@@ -189,34 +126,25 @@ def create_movie(
                 .values
             )
             targets.set_sizes(occupants)
+            """
             targets.set_color(
                 [
                     targets_color if o < 100 else targets_at_capacity_color
                     for o in occupants
                 ]
             )
+            """
 
             evacuated_total = model_df.evacuated.loc[step]
-            stranded = model_df.stranded.loc[step]
 
-            flood_model_title = "T={}min\n{}/{} Agents Evacuated ({:.0f}%)\n{}/{} Agents Stranded ({:.0f}%)".format(
-                (step * 10) // 60,
-                evacuated_total,
-                len(agent_locations),
-                evacuated_total / len(agent_locations) * 100,
-                stranded,
-                len(agent_locations),
-                stranded / len(agent_locations) * 100,
+            ax.set_title(
+                "T={}min\n{}/{} Agents Evacuated ({:.0f}%)".format(
+                    (step * 10) // 60,
+                    evacuated_total,
+                    len(agent_locations),
+                    evacuated_total / len(agent_locations) * 100,
+                )
             )
-
-            bomb_model_title = "T={}min\n{}/{} Agents Evacuated ({:.0f}%)".format(
-                (step * 10) // 60,
-                evacuated_total,
-                len(agent_locations),
-                evacuated_total / len(agent_locations) * 100,
-            )
-
-            ax.set_title(bomb_model_title if is_bomb_model else flood_model_title)
             writer.grab_frame()
 
 

@@ -49,5 +49,4 @@ if __name__ == "__main__":
     create_movie(
         os.path.join(outputs, "test-model"),
         os.path.join(outputs, "test-model.mp4"),
-        is_bomb_model=True,
     )
