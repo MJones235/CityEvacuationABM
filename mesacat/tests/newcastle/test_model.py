@@ -35,10 +35,12 @@ class TestEvacuationModel(TestCase):
         domain, _ = osmnx.projection.project_geometry(
             domain, "EPSG:3857", to_latlong=True
         )
-        start_time = datetime.time(hour=9)
-        agents = generate_agents(domain, 5000, population_data, start_time)
         BombEvacuationModel(
-            os.path.join(outputs, "test-model"), domain, hazard, agents
+            os.path.join(outputs, "test-model"),
+            domain,
+            hazard,
+            population_data,
+            datetime.time(hour=9),
         ).run(100)
 
 

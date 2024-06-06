@@ -7,6 +7,8 @@ from shapely.geometry import Polygon, Point
 from geopandas import GeoDataFrame, GeoSeries, sjoin
 from scipy.spatial import cKDTree
 import numpy as np
+from datetime import time
+from mesacat.generate_agents import generate_agents
 from . import bomb_agent
 import igraph
 import pandas as pd
@@ -27,7 +29,8 @@ class BombEvacuationModel(Model):
         output_path: str,
         domain: Polygon,
         evacuation_zone: GeoDataFrame,
-        agents: GeoDataFrame,
+        population_data_path: str,
+        start_time: time,
     ):
         super().__init__()
 
@@ -41,6 +44,8 @@ class BombEvacuationModel(Model):
         self.G = osmnx.graph_from_polygon(domain, simplify=False)
         self.G = self.G.to_undirected()
         self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
+
+        agents = generate_agents(domain, 5000, population_data_path, start_time)
 
         agents_in_evacuation_zone = self.get_agents_in_evacuation_zone(agents)
 
