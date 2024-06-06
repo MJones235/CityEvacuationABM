@@ -35,7 +35,7 @@ def position_at_time(
     supermarket: GeoSeries,
     shop: GeoSeries,
     recreation: GeoSeries,
-) -> Point:
+) -> tuple[Point, str | None, bool]:
     """
     Determine the location of an agent at a given time, based off their daily schedule
 
@@ -115,7 +115,9 @@ def position_at_time(
         car_speed = 48  # kph
         walking_speed = walking_speed
 
-        speed = car_speed if total_distance > 500 else walking_speed
+        in_car = total_distance > 500
+
+        speed = car_speed if in_car else walking_speed
 
         total_travel_time = (total_distance / 1000) / speed
 
@@ -138,13 +140,14 @@ def position_at_time(
                 t += timedelta(hours=time_to_next_node)
                 i += 1
 
-            node = nodes.iloc[path[i]]
-            return Point(node.x, node.y)
+            node = nodes.iloc[path[i - 2]]
+            return (Point(node.x, node.y), nodes.iloc[path[i]].name, in_car)
 
     current_location = point_from_node_name(
         current_node, home, work, school, supermarket, shop, recreation
     )
-    return current_location
+
+    return (current_location, None, False)
 
 
 def point_from_node_name(

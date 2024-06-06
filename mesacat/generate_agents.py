@@ -9,6 +9,7 @@ import random
 import igraph
 from scipy.spatial import cKDTree
 import numpy as np
+import pandas as pd
 
 from mesacat.schedule_utils import position_at_time
 
@@ -66,7 +67,7 @@ def generate_agents(
     agents["shop"] = random_buildings(shops, k=len(agents))
     agents["recreation"] = random_buildings(recreation_buildings, k=len(agents))
 
-    agents["geometry"] = agents.apply(
+    agents[["geometry", "destination", "in_car"]] = agents.apply(
         lambda row: position_at_time(
             row["agent_type"],
             start_time,
@@ -82,7 +83,7 @@ def generate_agents(
             row["recreation"],
         ),
         axis=1,
-    )
+    ).apply(pd.Series)
 
     locations = ["home", "work", "school", "supermarket", "shop", "recreation"]
 
@@ -248,14 +249,21 @@ def plot_agents(
     supermarkets.plot(ax=ax, color="white")
     shops.plot(ax=ax, color="silver")
     recreation_buildings.plot(ax=ax, color="lightsalmon")
-    agents[agents["agent_type"] == 0].plot(
-        ax=ax, markersize=2, color="red", label="Children"
+
+    agents[agents["in_car"]].plot(
+        ax=ax, markersize=4, color="purple", label="Vehicles", marker="s"
     )
-    agents[agents["agent_type"] == 1].plot(
-        ax=ax, markersize=2, color="blue", label="Working adults"
+
+    pedestrians = agents[~agents["in_car"]]
+
+    pedestrians[pedestrians["agent_type"] == 0].plot(
+        ax=ax, markersize=2, color="red", label="Children", marker="."
     )
-    agents[agents["agent_type"] == 2].plot(
-        ax=ax, markersize=2, color="orange", label="Retired adults"
+    pedestrians[pedestrians["agent_type"] == 1].plot(
+        ax=ax, markersize=2, color="blue", label="Working adults", marker="."
+    )
+    pedestrians[pedestrians["agent_type"] == 2].plot(
+        ax=ax, markersize=2, color="orange", label="Retired adults", marker="."
     )
 
     plt.title("Agent positions at {0}".format(start_time))
