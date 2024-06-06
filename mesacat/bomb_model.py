@@ -83,6 +83,7 @@ class BombEvacuationModel(Model):
                 "highway": "highway",
                 "reroute_count": "reroute_count",
                 "status": status,
+                "in_car": "in_car",
             },
         )
 

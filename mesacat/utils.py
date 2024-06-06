@@ -33,6 +33,7 @@ def create_movie(
     agents_color = "C1"
     rerouted_agents_color = "red"
     repeatedly_rerouted_agents_color = "purple"
+    vehicle_agents_color = "purple"
     agents_marker = "o"
     agents_size = 2
     agents_alpha = 1
@@ -116,6 +117,16 @@ def create_movie(
                 lines.Line2D(
                     [],
                     [],
+                    label="Vehicles",
+                    color=vehicle_agents_color,
+                    marker=agents_marker,
+                    markersize=agents_size,
+                    alpha=agents_alpha,
+                    linestyle="None",
+                ),
+                lines.Line2D(
+                    [],
+                    [],
                     label="Targets",
                     color=targets_color,
                     marker=targets_marker,
@@ -165,16 +176,8 @@ def create_movie(
             agents.set_offsets(agents_at_step[["lon", "lat"]].values)
             agents.set_color(
                 [
-                    (
-                        agents_color
-                        if a == 0
-                        else (
-                            rerouted_agents_color
-                            if a == 1
-                            else repeatedly_rerouted_agents_color
-                        )
-                    )
-                    for a in agents_at_step.reroute_count
+                    (vehicle_agents_color if agent_in_car else agents_color)
+                    for agent_in_car in agents_at_step.in_car
                 ]
             )
 
