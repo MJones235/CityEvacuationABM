@@ -1,10 +1,10 @@
 from __future__ import annotations
-from . import bomb_model
+from . import model
 from mesa import Agent
 import numpy as np
 
 
-class BombEvacuationAgent(Agent):
+class EvacuationAgent(Agent):
     """A person in the domain area at the time of the bomb threat
 
     Args:
@@ -23,7 +23,7 @@ class BombEvacuationAgent(Agent):
     def __init__(
         self,
         unique_id: int,
-        evacuation_model: bomb_model.BombEvacuationModel,
+        evacuation_model: model.EvacuationModel,
         agent: dict,
     ):
         super().__init__(unique_id, evacuation_model)

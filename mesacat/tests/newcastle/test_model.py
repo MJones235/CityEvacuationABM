@@ -8,7 +8,7 @@ from unittest import TestCase
 import geopandas as gpd
 import os
 import osmnx
-from mesacat.bomb_model import BombEvacuationModel
+from mesacat.model import EvacuationModel
 from mesacat.utils import create_movie
 from mesacat.generate_agents import generate_agents
 import datetime
@@ -35,7 +35,7 @@ class TestEvacuationModel(TestCase):
         domain, _ = osmnx.projection.project_geometry(
             domain, "EPSG:3857", to_latlong=True
         )
-        BombEvacuationModel(
+        EvacuationModel(
             os.path.join(outputs, "test-model"),
             domain,
             hazard,

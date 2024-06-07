@@ -9,13 +9,13 @@ from scipy.spatial import cKDTree
 import numpy as np
 from datetime import time
 from mesacat.generate_agents import generate_agents
-from . import bomb_agent
 import igraph
 import pandas as pd
 from networkx import write_gml
+from . import agent as evacuation_agent
 
 
-class BombEvacuationModel(Model):
+class EvacuationModel(Model):
     """A Mesa ABM model to simulation evacuation during a bomb threat
 
     Args:
@@ -26,7 +26,7 @@ class BombEvacuationModel(Model):
 
     def __init__(
         self,
-        output_path: str,
+        output_path: str | None,
         domain: Polygon,
         evacuation_zone: GeoDataFrame,
         population_data_path: str,
@@ -64,11 +64,12 @@ class BombEvacuationModel(Model):
         self.grid = NetworkGrid(self.G)
         self.igraph = igraph.Graph.from_networkx(self.G)
 
-        self.write_output_files(output_path, agents_in_evacuation_zone)
+        if output_path is not None:
+            self.write_output_files(output_path, agents_in_evacuation_zone)
 
         for i, agent in agents_in_evacuation_zone.iterrows():
             id = "agent-start-pos{0}".format(i)
-            a = bomb_agent.BombEvacuationAgent(i, self, agent)
+            a = evacuation_agent.EvacuationAgent(i, self, agent)
             self.schedule.add(a)
             self.grid.place_agent(a, id)
             a.update_route()
