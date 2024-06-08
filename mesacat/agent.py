@@ -40,6 +40,7 @@ class EvacuationAgent(Agent):
         self.agent_type = agent["agent_type"]
         self.in_car = agent["in_car"]
         self.speed = 48 if self.in_car else agent["walking_speed"]
+        self.delay = self.response_time()
 
     def update_route(self):
         # indices of target nodes
@@ -81,10 +82,17 @@ class EvacuationAgent(Agent):
         )[0]
         return edge["length"] - self.distance_along_edge
 
+    def response_time(self):
+        t = np.random.normal(300, 120)
+        return t if t > 0 else 0
+
     def step(self):
         """Moves the agent towards the target node by 10 seconds"""
 
         if self.evacuated:
+            return
+
+        if self.model.seconds_elapsed < self.delay and not self.in_car:
             return
 
         distance_to_travel = (

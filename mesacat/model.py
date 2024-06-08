@@ -36,6 +36,7 @@ class EvacuationModel(Model):
     ):
         super().__init__()
 
+        self.seconds_elapsed: int = 0
         self.output_path = output_path
 
         self.schedule = RandomActivation(self)
@@ -211,6 +212,7 @@ class EvacuationModel(Model):
     def step(self):
         self.schedule.step()
         self.data_collector.collect(self)
+        self.seconds_elapsed += 10
 
     def run(self, steps: int):
         self.data_collector.collect(self)
