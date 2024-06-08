@@ -41,6 +41,7 @@ class TestEvacuationModel(TestCase):
             hazard,
             population_data,
             datetime.time(hour=8, minute=30),
+            5000,
         ).run(100)
 
 

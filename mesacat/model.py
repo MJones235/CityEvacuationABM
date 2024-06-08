@@ -1,3 +1,4 @@
+import copy
 from mesa import Model
 from mesa.space import NetworkGrid
 from mesa.time import RandomActivation
@@ -31,6 +32,7 @@ class EvacuationModel(Model):
         evacuation_zone: GeoDataFrame,
         population_data_path: str,
         start_time: time,
+        n_agents: int,
     ):
         super().__init__()
 
@@ -45,7 +47,7 @@ class EvacuationModel(Model):
         self.G = self.G.to_undirected()
         self.nodes, self.edges = osmnx.convert.graph_to_gdfs(self.G)
 
-        agents = generate_agents(domain, 5000, population_data_path, start_time)
+        agents = generate_agents(domain, n_agents, population_data_path, start_time)
 
         agents_in_evacuation_zone = self.get_agents_in_evacuation_zone(agents)
 
@@ -60,6 +62,13 @@ class EvacuationModel(Model):
         self.target_nodes = self.nodes[
             self.nodes.index.str.contains("target", na=False)
         ]
+
+        agent_nodes = self.nodes[
+            self.nodes.index.str.contains("agent-start-pos", na=False)
+        ]
+        self.G_without_agent_start_pos = copy.deepcopy(self.G)
+        for osmid, _ in agent_nodes.iterrows():
+            self.G_without_agent_start_pos.remove_node(osmid)
 
         self.grid = NetworkGrid(self.G)
         self.igraph = igraph.Graph.from_networkx(self.G)
