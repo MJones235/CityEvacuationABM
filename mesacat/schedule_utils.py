@@ -108,7 +108,7 @@ def position_at_time(
             0
         ]
 
-        total_distance = igraph.shortest_paths(
+        total_distance = igraph.distances(
             origin_idx, destination_idx, weights="length"
         )[0][0]
 
@@ -132,7 +132,7 @@ def position_at_time(
             i = 0
             t = leave_time
             while t < target_time:
-                distance_to_next_node = igraph.shortest_paths(
+                distance_to_next_node = igraph.distances(
                     path[i], path[i + 1], weights="length"
                 )[0][0]
                 time_to_next_node = (distance_to_next_node / 1000) / speed

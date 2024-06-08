@@ -8,6 +8,7 @@ import solara
 
 sys.path.append("..")
 
+from mesacat.agent import EvacuationAgent
 from mesacat.model import EvacuationModel
 
 newcastle_test_data = os.path.join(os.path.dirname(__file__), "tests", "newcastle")
@@ -37,7 +38,7 @@ def agent_portrayal(agent):
     return {"edge_color": "black", "node_size": 0, "node_color": "#00b4d9"}
 
 
-def draw_network(model):
+def draw_network(model, _):
     f, ax = osmnx.plot_graph(
         model.G,
         dpi=200,
@@ -52,7 +53,7 @@ def draw_network(model):
 page = JupyterViz(
     EvacuationModel,
     model_params,
-    measures=[draw_network],
+    space_drawer=draw_network,
     agent_portrayal=agent_portrayal,
 )
 
